@@ -1,0 +1,231 @@
+/**
+ * Creates an instance of HLightMove. Parameter user_settings is optional.
+ *
+ * @example <caption>usage with default setting</caption>
+ * // highlight on anchor element
+ * $('a').click(function(e){
+ * 	(new HLightMove(this)).run(); // this parameter is required
+ * });
+ *
+ * @example <caption>usage with user setting</caption>
+ * // highlight on anchor element
+ * $('a').click(function(e){
+ * 	(new HLightMove(this, {
+ *		'bgcolor': 'blue',
+ *		'speed': 'slow'
+ * 	})).run(); // this parameter is required
+ * });
+ *
+ * @example <caption>usage with user setting</caption>
+ * // highlight on anchor element
+ * $('a').click(function(e){
+ * 	(new HLightMove(this, {
+ *		'bgcolor': 'rgba(10, 200, 60, 0.8)',
+ *		'speed': 'normal'
+ * 	})).run(); // this parameter is required
+ * });
+ *
+ * @constructor
+ * @this {HLightMove}
+ * @param {object} this_pointer References to current/clicked anchor elements.
+ * @param {object} user_settings Setting for highlight instance and animation.
+ */
+function HLightMove(this_pointer, user_settings){
+	this.this_pointer = this_pointer;
+	this.user_settings = user_settings || {};
+}
+
+/**
+ * References to object to be highlighted.
+ */
+HLightMove.prototype.this_pointer = this.this_pointer;
+
+/**
+ * User settings.
+ */
+HLightMove.prototype.user_setting = this.user_settings;
+
+/**
+ * Default value of HLightMove basic settings.
+ */
+HLightMove.prototype.DEFAULT_VALUE = {
+
+	// maximum width of highlight element
+	MAX_WIDTH: 30,
+
+	// duration time for fade in / fade out
+	NORMAL_DURATION_TIME: 300,
+
+	// heuristic number of running highlight element
+	// refers to 4 * NORMAL_DURATION_TIME
+	MID_TIMES_DURATION: 4,
+	MAX_Z_INDEX: 9999,
+	ZERO_VALUE: 0,
+	BG_COLOR : "rgba(0, 0, 0, .5)"
+};
+
+/**
+ * Creates a new element.
+ *
+ * @param {string} _type Markdown element type, e.g. 'div'.
+ * @param {string} _class Class to be assigned.
+ * @param {object} _attr Element attributes to be assigned, only one attributes.
+ *
+ * @example <caption> usage of _type parameter</caption>
+ * // return element <span>
+ * element_factory('span', '', undefined);
+ *
+ * @example <caption> usage of _class parameter</caption>
+ * // return element <div class='header'>
+ * element_factory('div', 'header', undefined);
+ *
+ * @example <caption> usage of _attr parameter</caption>
+ * // return element <a href='index.html'>
+ * element_factory('a', '', {key: 'href', value: 'index.html'});
+ *
+ * @return {object} New element based on parameters.
+ */
+HLightMove.prototype.element_factory = function(_type, _class, _attr){
+	var el = document.createElement(_type);
+	$(el).addClass(_class);
+	if(_attr != undefined)
+		$(el).attr(_attr.key, _attr.value);
+
+	return el;
+}
+
+/**
+ * Creates a new configuration object.
+ *
+ * @example
+ * get_settings_variable();
+ * return object{
+ *	bg_color: ~,
+ *	duration: ~,
+ *	duration_mid: ~,
+ *	top_position: ~,
+ *	left_position: ~,
+ *	width_position: ~,
+ *	height_position: ~,
+ *	actual_width: ~
+ * }
+ *
+ * @return {object} Configuration object for creating HLightMove instance.
+ */
+HLightMove.prototype.get_settings_variable = function(){
+
+    // warna latar belakang highlight element
+    var bg_color = this.user_settings.bgcolor || this.DEFAULT_VALUE.BG_COLOR;
+
+	// heuristic time to normal duration
+	// @dependent: {{ this }}
+	var time_rate_h = 0.5 - 0.04 * Math.log($(this.this_pointer).html().length);
+
+	// time rate speed clustering
+	var speed = [];
+    speed['normal'] = time_rate_h;
+    speed['fast'] = 0.75 * time_rate_h;
+    speed['slow'] = 2 * time_rate_h;
+
+    // kecepatan gerak highlight element (heuristik)
+    var time_rate = speed[this.user_settings.speed] || speed['normal'];
+
+    // durasi waktu fade in dan fade out
+    var duration = parseInt(time_rate * this.DEFAULT_VALUE.NORMAL_DURATION_TIME);
+
+    // durasi waktu ketika bergerak ditengah
+    // dependent to width_position
+    var duration_mid = parseInt(time_rate * this.DEFAULT_VALUE.MID_TIMES_DURATION * this.this_pointer.offsetWidth);
+
+	// cek anchor lebih kecil daripada MAX_WIDTH
+	var actual_width = this.this_pointer.offsetWidth < this.DEFAULT_VALUE.MAX_WIDTH 
+		? this.this_pointer.offsetWidth 
+		: this.DEFAULT_VALUE.MAX_WIDTH;
+
+	return {
+		bg_color: bg_color,
+		duration: duration,
+		duration_mid: duration_mid,
+		top_position: this.this_pointer.offsetTop,
+		left_position: this.this_pointer.offsetLeft,
+		width_position: this.this_pointer.offsetWidth,
+		height_position: this.this_pointer.offsetHeight,
+		actual_width: actual_width
+	}
+}
+
+/**
+ * Creates new Highlight element that has configured.
+ *
+ * @param {object} settings configuration object.
+ * @return {object} Return [element_factory]{@link HLightMove#element_factory} returned value with some css added.
+ */
+HLightMove.prototype.create_new_highlight_element = function(settings){
+	var highlight_element = this.element_factory('div', '', undefined);
+
+    // highighted element style
+    $(highlight_element).css({
+		"position": "absolute",
+		"top": settings.top_position,
+		"left": settings.left_position,
+		"width": "0px",
+		"height": settings.height_position,
+		"background-color": settings.bg_color,
+		"border-radius": this.DEFAULT_VALUE.ZERO_VALUE,
+		"z-index": this.DEFAULT_VALUE.MAX_Z_INDEX
+    });
+
+    return highlight_element;
+}
+
+/**
+ * Assigned animation to an instance of configured element.
+ *
+ * @param {object} instance_el configured element.
+ * @param {object} settings settings configuration.
+ */
+HLightMove.prototype.build_animation = function(instance_el, settings){
+
+	var this_class = this;
+
+	// animasi fade out
+	var close_anim = function(){
+		$(instance_el).animate({
+			"width": this_class.DEFAULT_VALUE.ZERO_VALUE, 
+			"left": settings.width_position + settings.left_position
+		}, settings.duration, function(){
+			$(instance_el).remove();
+		});
+	}
+
+	// animasi fade in
+    $(instance_el).animate({"width": parseInt(settings.actual_width)}, settings.duration, function(){
+
+    	// cek anchor lebih besar sama dengan MAX_WIDTH
+    	if(settings.width_position >= this_class.DEFAULT_VALUE.MAX_WIDTH)
+
+    		// animasi bergerak ditengah
+			$(instance_el).animate({
+				"left": (settings.left_position + settings.width_position - this_class.DEFAULT_VALUE.MAX_WIDTH)
+			}, settings.duration_mid , function(){
+				close_anim();
+			});
+		else
+			close_anim();
+    });
+}
+
+/**
+ * Create setting and instances element,
+ * configure instances element based on setting,
+ * assign animation to configured instances.
+ */
+HLightMove.prototype.run = function(){
+	var settings = this.get_settings_variable();
+	var instance_el = this.create_new_highlight_element(settings);
+
+    // highlight element ditambahkan sebelum elemen anchor
+    $(this.this_pointer).before($(instance_el));
+
+    this.build_animation(instance_el, settings);
+}
