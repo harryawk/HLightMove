@@ -2,7 +2,7 @@
 
 is a running highlight for HTML element text, image, etc.
 
-![capture](../img/optimised.gif "capture")
+![capture](https://github.com/riochr17/HLightMove/raw/master/img/optimised.gif "capture")
 
 ## Usage
 
